@@ -6,3 +6,7 @@ __pycache__/
 *.tfstate
 *.tfstate.*
 .terraform.lock.hcl
+
+lambda/*
+!lambda/handler.py
+!lambda/lambda.zip
