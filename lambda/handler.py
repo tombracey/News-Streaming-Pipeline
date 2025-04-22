@@ -18,7 +18,7 @@ def get_guardian_articles(query, date_from=None, num_results=10):
     }
 
     if date_from:
-        params["from-date"] = date_from
+        params["from-date"] = date_from # date_from input is optional
 
     response = requests.get(url, params=params)
 
