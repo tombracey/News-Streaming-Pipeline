@@ -15,7 +15,8 @@ resource "aws_lambda_function" "streaming_lambda" {
 
   environment {
     variables = {
-      QUEUE_URL = aws_sqs_queue.terraform_queue.url
+        QUEUE_URL = aws_sqs_queue.terraform_queue.url
+        QUEUE_NAME = aws_sqs_queue.terraform_queue.name
     }
   }
 }
