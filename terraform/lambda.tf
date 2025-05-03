@@ -13,6 +13,8 @@ resource "aws_lambda_function" "streaming_lambda" {
 
   runtime          = "python3.12"
 
+  timeout = 30 # default is just 3
+
   environment {
     variables = {
         QUEUE_URL = aws_sqs_queue.terraform_queue.url
