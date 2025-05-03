@@ -19,6 +19,7 @@ resource "aws_lambda_function" "streaming_lambda" {
     variables = {
         QUEUE_URL = aws_sqs_queue.terraform_queue.url
         QUEUE_NAME = aws_sqs_queue.terraform_queue.name
+        GUARDIAN_API_KEY = var.guardian_api_key
     }
   }
 }
