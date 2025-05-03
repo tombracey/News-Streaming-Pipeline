@@ -31,7 +31,7 @@ def get_guardian_articles(query, date_from=None, num_results=10):
         params["from-date"] = date_from # date_from input is optional
 
     try:
-        logger.info(f"Calling Guardian API\nParameters: {params}")
+        logger.info(f"Calling Guardian API\nQuery: {query}\nFrom date: {date_from}")
         response = requests.get(url, params=params)
 
         if response.status_code == 200:
