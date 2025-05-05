@@ -33,7 +33,10 @@ def get_guardian_articles(query, date_from=None, num_results=10):
         params["from-date"] = date_from # date_from input is optional
 
     try:
-        logger.info(f"Calling Guardian API\nQuery: {query}\nFrom date: {date_from}")
+        api_call_log_string = f"Calling Guardian API\nQuery: {query}"
+        if date_from:
+            api_call_log_string += f"\nFrom date: {date_from}"
+        logger.info(api_call_log_string)
         response = requests.get(url, params=params)
 
         if response.status_code == 200:
@@ -106,11 +109,15 @@ if __name__ == "__main__":
     parser.add_argument("--queue_name", help="SQS queue name (optional)", default="guardian_content")
     args = parser.parse_args()
 
+    query = args.query
+    if " " in query and not (query[0] == '"' and query[-1] == '"'):
+        query = f'"{query}"' # Wraps the queries (e.g. 'machine learning' treated as a phrase) to improve relevance of articles
+
     try:
-        articles = get_guardian_articles(args.query, args.date_from)
+        articles = get_guardian_articles(query, args.date_from)
         print(f"Using queue: {args.queue_name}")
         send_to_sqs(articles, args.queue_name)
-        print("Articles successfully sent to SQS")
+        print(f"{len(articles)} articles successfully sent to SQS")
     except Exception as e:
         logger.error(f"Error sending to SQS: {str(e)}")
         raise
