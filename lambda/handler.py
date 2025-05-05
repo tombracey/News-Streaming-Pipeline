@@ -4,12 +4,14 @@ from dotenv import load_dotenv
 import json
 import boto3
 import logging
+import argparse
 
 logger = logging.getLogger('handler')
 logger.setLevel(logging.INFO)
 
+load_dotenv()
+
 def get_guardian_articles(query, date_from=None, num_results=10):
-    load_dotenv()
     api_key = os.getenv("GUARDIAN_API_KEY")
 
     if not api_key:
@@ -56,25 +58,32 @@ def get_guardian_articles(query, date_from=None, num_results=10):
         logger.error(f"Error returning articles: {str(e)}")
 
 def get_queue_url(queue_name):
+    queue_url = os.getenv("QUEUE_URL") # gets QUEUE_URL if it exists as an env variable...
+    if queue_url:
+        logger.info(f"Using QUEUE_URL from environment: {queue_url}")
+        return queue_url
+    
     try:
-        queue_url = os.getenv("QUEUE_URL")
-        if queue_url:
-            return queue_url # gets QUEUE_URL if it exists as an env variable...
-        else:
-            sqs_client = boto3.client('sqs', region_name="eu-west-2")
-            response = sqs_client.get_queue_url(QueueName=queue_name)
-            return response['QueueUrl'] # ...if not, gets it from AWS
+        sqs_client = boto3.client("sqs", region_name="eu-west-2") # ...if not, gets it from AWS
+        response = sqs_client.get_queue_url(QueueName=queue_name)
+        queue_url = response["QueueUrl"]
+        logger.info(f"Using queue URL from AWS: {queue_url}")
+        return queue_url
     except Exception as e:
-        logger.error(f"Error finding queue URL: {str(e)}")
+        logger.error(f"Error retrieving queue URL: {e}")
+        raise
 
 def send_to_sqs(articles, queue_name):
     try:
-        boto3_client = boto3.client('sqs', region_name="eu-west-2")
+        session = boto3.Session(region_name="eu-west-2")
+        boto3_client = session.client('sqs')
+        
         queue_url = get_queue_url(queue_name)
         for article in articles:
             boto3_client.send_message(QueueUrl=queue_url, MessageBody=json.dumps(article))
     except Exception as e:
         logger.error(f"Error sending to SQS: {str(e)}")
+        raise
 
 def lambda_handler(event, context):
     query = event.get("query")
@@ -89,3 +98,19 @@ def lambda_handler(event, context):
         "statusCode": 200,
         "body": json.dumps({"message": "Articles successfully sent to SQS"})
     }
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Fetch articles and send to SQS")
+    parser.add_argument("query", help="Query string for Guardian API")
+    parser.add_argument("--date_from", help="Filter by date from, YYYY-MM-DD (optional)", default=None)
+    parser.add_argument("--queue_name", help="SQS queue name (optional)", default="guardian_content")
+    args = parser.parse_args()
+
+    try:
+        articles = get_guardian_articles(args.query, args.date_from)
+        print(f"Using queue: {args.queue_name}")
+        send_to_sqs(articles, args.queue_name)
+        print("Articles successfully sent to SQS")
+    except Exception as e:
+        logger.error(f"Error sending to SQS: {str(e)}")
+        raise
