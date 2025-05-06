@@ -1,6 +1,6 @@
 # News Streaming Pipeline
 
-A proof of concept tool developed for Tech Returners which retrieves recent news articles from the Guardian API based on a search term, and sends them to an AWS SQS message broker.
+A proof of concept tool developed for Tech Returners which retrieves recent news articles from the Guardian API based on a search term, and sends them to an AWS SQS message broker. This is aimed at use by the marketing and careers teams, and can be used as a component of an AWS application.
 
 <img src="images/erd.png" alt="pipeline diagram" width="500">
 
@@ -17,7 +17,7 @@ A proof of concept tool developed for Tech Returners which retrieves recent news
 - Terraform
 - Guardian API Key [(register here)](https://open-platform.theguardian.com/access/)
 - AWS CLI configured with access keys for a user with IAM, Lambda and SQS access
-- Safety CLI (free) or a paid Safety account - runnning `make deploy` will prompt account setup
+- Safety CLI (free) or a paid Safety account - running `make deploy` will prompt account setup
 
 ## How to Run
 ### Clone
