@@ -2,3 +2,5 @@ requests
 python-dotenv
 pytest
 boto3
+safety
+flake8

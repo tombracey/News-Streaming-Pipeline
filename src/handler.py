@@ -11,6 +11,7 @@ logger.setLevel(logging.INFO)
 
 load_dotenv()
 
+
 def get_guardian_articles(query, date_from=None, num_results=10):
     api_key = os.getenv("GUARDIAN_API_KEY")
 
@@ -19,18 +20,19 @@ def get_guardian_articles(query, date_from=None, num_results=10):
         logger.error(err_message)
         raise ValueError(err_message)
 
-    url = f"https://content.guardianapis.com/search"
+    url = "https://content.guardianapis.com/search"
 
     params = {
         "api-key": api_key,
         "q": query,
-        "page-size": num_results, # 10 is the default anyway, but coded in case that changes
+        "page-size": num_results,
+        # 10 is the default page-size anyway, but coded in case that changes
         "order-by": "newest",
         "show-fields": "trailText,body",
     }
 
     if date_from:
-        params["from-date"] = date_from # date_from input is optional
+        params["from-date"] = date_from  # date_from input is optional
 
     try:
         api_call_log_string = f"Calling Guardian API\nQuery: {query}"
@@ -48,11 +50,12 @@ def get_guardian_articles(query, date_from=None, num_results=10):
                     "webTitle": article["webTitle"],
                     "webUrl": article["webUrl"],
                 }
-                
+
                 # Adds content preview if one can be provided
                 if "fields" in article and "trailText" in article["fields"]:
-                    article_obj["content_preview"] = article["fields"]["trailText"][:1000]
-                
+                    trail = article["fields"]["trailText"]
+                    article_obj["content_preview"] = trail[:1000]
+
                 articles.append(article_obj)
             return articles
         else:
@@ -60,14 +63,17 @@ def get_guardian_articles(query, date_from=None, num_results=10):
     except Exception as e:
         logger.error(f"Error returning articles: {str(e)}")
 
+
 def get_queue_url(queue_name):
-    queue_url = os.getenv("QUEUE_URL") # gets QUEUE_URL if it exists as an env variable...
+    # gets QUEUE_URL if it exists as an env variable...
+    queue_url = os.getenv("QUEUE_URL")
     if queue_url:
         logger.info(f"Using QUEUE_URL from environment: {queue_url}")
         return queue_url
-    
+
     try:
-        sqs_client = boto3.client("sqs", region_name="eu-west-2") # ...if not, gets it from AWS
+        # ...if not, gets it from AWS
+        sqs_client = boto3.client("sqs", region_name="eu-west-2")
         response = sqs_client.get_queue_url(QueueName=queue_name)
         queue_url = response["QueueUrl"]
         logger.info(f"Using queue URL from AWS: {queue_url}")
@@ -76,25 +82,30 @@ def get_queue_url(queue_name):
         logger.error(f"Error retrieving queue URL: {e}")
         raise
 
+
 def send_to_sqs(articles, queue_name):
     try:
         session = boto3.Session(region_name="eu-west-2")
         boto3_client = session.client('sqs')
-        
+
         queue_url = get_queue_url(queue_name)
         for article in articles:
-            boto3_client.send_message(QueueUrl=queue_url, MessageBody=json.dumps(article, indent=2))
+            boto3_client.send_message(
+                QueueUrl=queue_url,
+                MessageBody=json.dumps(article, indent=2)
+            )
     except Exception as e:
         logger.error(f"Error sending to SQS: {str(e)}")
         raise
 
+
 def lambda_handler(event, context):
     query = event.get("query")
     date_from = event.get("date_from")
-    
+
     articles = get_guardian_articles(query, date_from)
 
-    queue_name = os.getenv("QUEUE_NAME", "terraform-queue")
+    queue_name = os.getenv("QUEUE_NAME")
     send_to_sqs(articles, queue_name)
 
     return {
@@ -102,16 +113,34 @@ def lambda_handler(event, context):
         "body": json.dumps({"message": "Articles successfully sent to SQS"})
     }
 
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Fetch articles and send to SQS")
-    parser.add_argument("query", help="Query string for Guardian API")
-    parser.add_argument("--date_from", help="Filter by date from, YYYY-MM-DD (optional)", default=None)
-    parser.add_argument("--queue_name", help="SQS queue name (optional)", default="guardian_content")
+    parser = argparse.ArgumentParser(
+        description="Fetch articles and send to SQS"
+    )
+    parser.add_argument(
+        "query",
+        help="Query string for Guardian API"
+    )
+    parser.add_argument(
+        "--date_from",
+        help="Filter by date from, YYYY-MM-DD (optional)",
+        default=None
+    )
+    parser.add_argument(
+        "--queue_name",
+        help="SQS queue name (optional)",
+        default="guardian_content"
+    )
+
     args = parser.parse_args()
+
+    # Wrap queries in quotation marks (e.g. "machine learning"
+    # treated as a phrase) to improve the relevance of articles
 
     query = args.query
     if " " in query and not (query[0] == '"' and query[-1] == '"'):
-        query = f'"{query}"' # Wraps the queries (e.g. 'machine learning' treated as a phrase) to improve relevance of articles
+        query = f'"{query}"'
 
     try:
         articles = get_guardian_articles(query, args.date_from)
